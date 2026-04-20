@@ -6,7 +6,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:internet_connection_checker/internet_connection_checker.dart';
+import 'package:internet_connection_checker_plus/internet_connection_checker_plus.dart';
 
 class Logging extends StatefulWidget {
   const Logging({super.key});
@@ -230,8 +230,8 @@ class _LoggingState extends State<Logging> with TickerProviderStateMixin {
                                 });
 
                                 bool result =
-                                    await InternetConnectionChecker.createInstance()
-                                        .hasConnection;
+                                    await InternetConnection()
+                                        .hasInternetAccess;
 
                                 if (!result) {
                                   setState(() {
