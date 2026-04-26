@@ -1,5 +1,6 @@
 import 'package:bingo/Common/Logging.dart';
 import 'package:bingo/Common/app_theme.dart';
+import 'package:bingo/Driver/Dri_Location_Service.dart';
 import 'package:bingo/Driver/Dri_Nav_Bar.dart';
 import 'package:bingo/Driver/Dri_Profile.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -33,6 +34,8 @@ class _DriHomeState extends State<DriHome> with SingleTickerProviderStateMixin {
   String _driverAddress = '';
   String _driverMobile = '';
   bool _isLoading = true;
+  bool _isOnDuty = false;
+  bool _dutyBusy = false;
 
   @override
   void initState() {
@@ -46,6 +49,7 @@ class _DriHomeState extends State<DriHome> with SingleTickerProviderStateMixin {
       curve: Curves.easeInOut,
     );
     _controller.forward();
+    _isOnDuty = DriverLocationService.instance.isPublishing;
     _loadDashboardData();
   }
 
@@ -53,6 +57,36 @@ class _DriHomeState extends State<DriHome> with SingleTickerProviderStateMixin {
   void dispose() {
     _controller.dispose();
     super.dispose();
+  }
+
+  Future<void> _toggleDuty() async {
+    if (_dutyBusy) return;
+    setState(() => _dutyBusy = true);
+    try {
+      if (_isOnDuty) {
+        await DriverLocationService.instance.stop();
+        if (mounted) setState(() => _isOnDuty = false);
+      } else {
+        await DriverLocationService.instance.start(
+          driverEmail: widget.driverEmail,
+          driverName: widget.driverName,
+        );
+        if (mounted) setState(() => _isOnDuty = true);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: AppTheme.errorRed,
+            content: Text(
+              e is StateError ? e.message : 'Failed to update duty status.',
+            ),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _dutyBusy = false);
+    }
   }
 
   Future<void> _loadDashboardData() async {
@@ -121,6 +155,7 @@ class _DriHomeState extends State<DriHome> with SingleTickerProviderStateMixin {
     );
 
     if (confirm == true && mounted) {
+      await DriverLocationService.instance.stop();
       await FirebaseAuth.instance.signOut();
       if (mounted) {
         Navigator.pushAndRemoveUntil(
@@ -282,29 +317,56 @@ class _DriHomeState extends State<DriHome> with SingleTickerProviderStateMixin {
             ),
           ),
           const SizedBox(height: 12),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.15),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Container(
-                  width: 8,
-                  height: 8,
-                  decoration: const BoxDecoration(
-                    color: AppTheme.successGreen,
-                    shape: BoxShape.circle,
+          GestureDetector(
+            onTap: _toggleDuty,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 250),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: _isOnDuty
+                    ? AppTheme.successGreen.withOpacity(0.22)
+                    : Colors.white.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(
+                  color: _isOnDuty
+                      ? AppTheme.successGreen.withOpacity(0.6)
+                      : Colors.white.withOpacity(0.18),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_dutyBusy)
+                    const SizedBox(
+                      width: 10,
+                      height: 10,
+                      child: CupertinoActivityIndicator(
+                        color: Colors.white,
+                        radius: 6,
+                      ),
+                    )
+                  else
+                    Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: _isOnDuty
+                            ? AppTheme.successGreen
+                            : Colors.white70,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  Text(
+                    _isOnDuty ? 'On Duty — Sharing Location' : 'Off Duty — Tap to Go Live',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                const Text(
-                  'On Duty',
-                  style: TextStyle(color: Colors.white, fontSize: 13),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
         ],
